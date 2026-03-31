@@ -17,6 +17,7 @@ import { localScraperService } from '../../services/pluginService';
 import { VideoPlayerService } from '../../services/videoPlayerService';
 import { streamCacheService } from '../../services/streamCacheService';
 import { tmdbService } from '../../services/tmdbService';
+import { embyService } from '../../services/emby/embyService';
 import { logger } from '../../utils/logger';
 import { TABLET_BREAKPOINT } from './constants';
 import {
@@ -40,6 +41,12 @@ import {
 // Cache for scraper logos
 const scraperLogoCache = new Map<string, string>();
 let scraperLogoCachePromise: Promise<void> | null = null;
+
+const BUILT_IN_PROVIDER_LABELS: Record<string, string> = {
+  'emby-local': 'Emby Server',
+};
+
+const isBuiltInProvider = (providerId: string) => providerId in BUILT_IN_PROVIDER_LABELS;
 
 export const useStreamsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'Streams'>>();
@@ -223,6 +230,9 @@ export const useStreamsScreen = () => {
       }
 
       const getProviderPriority = (addonId: string): number => {
+        if (addonId === 'emby-local') {
+          return 100;
+        }
         const installedAddons = stremioService.getInstalledAddons();
         const addonIndex = installedAddons.findIndex(addon => addon.id === addonId);
         if (addonIndex !== -1) {
@@ -651,7 +661,8 @@ export const useStreamsScreen = () => {
       try {
         const hasStremioProviders = await stremioService.hasStreamProviders(type);
         const hasLocalScrapers = settings.enableLocalScrapers && (await localScraperService.hasScrapers());
-        const hasProviders = hasStremioProviders || hasLocalScrapers;
+        const hasEmbyProvider = await embyService.isConnected();
+        const hasProviders = hasStremioProviders || hasLocalScrapers || hasEmbyProvider;
 
         if (!isMounted.current) return;
 
@@ -761,7 +772,9 @@ export const useStreamsScreen = () => {
       const pluginProviders: string[] = [];
 
       Array.from(allProviders).forEach(provider => {
-        const isInstalledAddon = installedAddons.some(addon => addon.installationId === provider || addon.id === provider);
+        const isInstalledAddon =
+          isBuiltInProvider(provider) ||
+          installedAddons.some(addon => addon.installationId === provider || addon.id === provider);
         if (isInstalledAddon) {
           addonProviders.push(provider);
         } else {
@@ -773,11 +786,17 @@ export const useStreamsScreen = () => {
 
       addonProviders
         .sort((a, b) => {
+          if (isBuiltInProvider(a) && !isBuiltInProvider(b)) return -1;
+          if (!isBuiltInProvider(a) && isBuiltInProvider(b)) return 1;
           const indexA = installedAddons.findIndex(addon => addon.installationId === a || addon.id === a);
           const indexB = installedAddons.findIndex(addon => addon.installationId === b || addon.id === b);
           return indexA - indexB;
         })
         .forEach(provider => {
+          if (isBuiltInProvider(provider)) {
+            filterChips.push({ id: provider, name: BUILT_IN_PROVIDER_LABELS[provider] });
+            return;
+          }
           const installedAddon = installedAddons.find(addon => addon.installationId === provider || addon.id === provider);
           // For multiple installations of same addon, show URL to differentiate
           const sameAddonInstallations = installedAddons.filter(a => installedAddon && a.id === installedAddon.id);
@@ -815,6 +834,8 @@ export const useStreamsScreen = () => {
       { id: 'all', name: 'All Providers' },
       ...Array.from(allProviders)
         .sort((a, b) => {
+          if (isBuiltInProvider(a) && !isBuiltInProvider(b)) return -1;
+          if (!isBuiltInProvider(a) && isBuiltInProvider(b)) return 1;
           const indexA = installedAddons.findIndex(addon => addon.installationId === a || addon.id === a);
           const indexB = installedAddons.findIndex(addon => addon.installationId === b || addon.id === b);
           if (indexA !== -1 && indexB !== -1) return indexA - indexB;
@@ -824,6 +845,9 @@ export const useStreamsScreen = () => {
         })
         .map(provider => {
           const addonInfo = streams[provider];
+          if (isBuiltInProvider(provider)) {
+            return { id: provider, name: BUILT_IN_PROVIDER_LABELS[provider] };
+          }
           const installedAddon = installedAddons.find(addon => addon.installationId === provider || addon.id === provider);
           let displayName = provider;
           if (installedAddon) {
@@ -854,7 +878,9 @@ export const useStreamsScreen = () => {
         const repoId = selectedProvider.replace('repo-', '');
         if (!repoId) return false;
 
-        const isInstalledAddon = installedAddons.some(addon => addon.installationId === key || addon.id === key);
+        const isInstalledAddon =
+          isBuiltInProvider(key) ||
+          installedAddons.some(addon => addon.installationId === key || addon.id === key);
         if (isInstalledAddon) return false; // Not a plugin
 
         // Check if this plugin belongs to the selected repository
@@ -864,7 +890,9 @@ export const useStreamsScreen = () => {
 
       // Legacy: handle old grouped-plugins filter (fallback)
       if (settings.streamDisplayMode === 'grouped' && selectedProvider === 'grouped-plugins') {
-        const isInstalledAddon = installedAddons.some(addon => addon.installationId === key || addon.id === key);
+        const isInstalledAddon =
+          isBuiltInProvider(key) ||
+          installedAddons.some(addon => addon.installationId === key || addon.id === key);
         return !isInstalledAddon;
       }
 
@@ -873,8 +901,12 @@ export const useStreamsScreen = () => {
 
     // Sort entries: installed addons first (in their installation order), then plugins
     const sortedEntries = filteredEntries.sort(([keyA], [keyB]) => {
-      const isAddonA = installedAddons.some(addon => addon.installationId === keyA || addon.id === keyA);
-      const isAddonB = installedAddons.some(addon => addon.installationId === keyB || addon.id === keyB);
+      const isAddonA =
+        isBuiltInProvider(keyA) ||
+        installedAddons.some(addon => addon.installationId === keyA || addon.id === keyA);
+      const isAddonB =
+        isBuiltInProvider(keyB) ||
+        installedAddons.some(addon => addon.installationId === keyB || addon.id === keyB);
 
       // Addons always come before plugins
       if (isAddonA && !isAddonB) return -1;
@@ -882,6 +914,8 @@ export const useStreamsScreen = () => {
 
       // Both are addons - sort by installation order
       if (isAddonA && isAddonB) {
+        if (isBuiltInProvider(keyA) && !isBuiltInProvider(keyB)) return -1;
+        if (!isBuiltInProvider(keyA) && isBuiltInProvider(keyB)) return 1;
         const indexA = installedAddons.findIndex(addon => addon.installationId === keyA || addon.id === keyA);
         const indexB = installedAddons.findIndex(addon => addon.installationId === keyB || addon.id === keyB);
         return indexA - indexB;
@@ -901,7 +935,9 @@ export const useStreamsScreen = () => {
       const pluginStreams: Stream[] = [];
 
       sortedEntries.forEach(([key, { streams: providerStreams }]) => {
-        const isInstalledAddon = installedAddons.some(addon => addon.installationId === key || addon.id === key);
+        const isInstalledAddon =
+          isBuiltInProvider(key) ||
+          installedAddons.some(addon => addon.installationId === key || addon.id === key);
 
         if (isInstalledAddon) {
           addonStreams.push(...providerStreams);
@@ -948,7 +984,9 @@ export const useStreamsScreen = () => {
 
     return sortedEntries
       .map(([key, { addonName, streams: providerStreams }]) => {
-        const isInstalledAddon = installedAddons.some(addon => addon.installationId === key || addon.id === key);
+        const isInstalledAddon =
+          isBuiltInProvider(key) ||
+          installedAddons.some(addon => addon.installationId === key || addon.id === key);
         const installedAddon = installedAddons.find(addon => addon.installationId === key || addon.id === key);
         let filteredStreams = providerStreams;
 
@@ -965,7 +1003,7 @@ export const useStreamsScreen = () => {
         }
 
         // For multiple installations of same addon, add # to section title
-        let sectionTitle = addonName;
+        let sectionTitle = isBuiltInProvider(key) ? BUILT_IN_PROVIDER_LABELS[key] : addonName;
         if (installedAddon) {
           const sameAddonInstallations = installedAddons.filter(a => a.id === installedAddon.id);
           const hasMultiple = sameAddonInstallations.length > 1;

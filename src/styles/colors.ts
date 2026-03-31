@@ -57,5 +57,6 @@ export const colors = {
   // Material Design text emphasis levels
   highEmphasis: 'rgba(255, 255, 255, 1)',     // Primary text
   mediumEmphasis: 'rgba(255, 255, 255, 0.7)', // Secondary text
+  lowEmphasis: 'rgba(255, 255, 255, 0.7)',    // Legacy alias used by some inputs
   disabled: 'rgba(255, 255, 255, 0.38)',      // Disabled text
 }; 

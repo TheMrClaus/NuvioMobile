@@ -36,7 +36,7 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 const TRAKT_CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID as string;
 
 if (!TRAKT_CLIENT_ID) {
-  throw new Error('Missing EXPO_PUBLIC_TRAKT_CLIENT_ID environment variable');
+  logger.warn('[TraktSettingsScreen] Missing EXPO_PUBLIC_TRAKT_CLIENT_ID environment variable. Trakt integration will be disabled.');
 }
 
 const discovery = {

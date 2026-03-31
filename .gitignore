@@ -57,7 +57,6 @@ android/app/libs/*.aar
 !android/app/libs/libmpv-release.aar
 HEATING_OPTIMIZATIONS.md
 # sliderreadme.md
-.cursor/mcp.json
 local-scrapers-repo
 worki.json
 VERSION_UPDATE_README.md
@@ -106,4 +105,4 @@ iTorrent/
 simkl-docss
 downloader.md
 server
-Deliverables 2
+Deliverables 2CLAUDE.md

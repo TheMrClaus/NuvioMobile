@@ -131,11 +131,14 @@ class EmbyService {
   async testConnection(serverUrl: string, apiKey: string): Promise<{ ok: boolean; userId: string; serverName: string }> {
     const cleanUrl = serverUrl.replace(/\/$/, '');
     try {
-      // 1. Ping system info
+      // 1. Ping system info (verifies the API key is valid)
       const info = await this.request<EmbySystemInfo>(cleanUrl, apiKey, '/System/Info');
-      // 2. Resolve user bound to this API key via /Users/Me
-      const user = await this.request<{ Id: string; Name: string }>(cleanUrl, apiKey, '/Users/Me');
-      return { ok: true, userId: user.Id, serverName: info.ServerName };
+      // 2. API keys are server-level and not bound to a user, so /Users/Me returns 401.
+      //    Instead, list all users and pick the first administrator.
+      const users = await this.request<Array<{ Id: string; Name: string; Policy?: { IsAdministrator?: boolean } }>>(cleanUrl, apiKey, '/Users');
+      const adminUser = users.find(u => u.Policy?.IsAdministrator) ?? users[0];
+      if (!adminUser) throw new Error('No users found on Emby server');
+      return { ok: true, userId: adminUser.Id, serverName: info.ServerName };
     } catch (err) {
       logger.warn('[EmbyService] testConnection failed:', err);
       return { ok: false, userId: '', serverName: '' };
@@ -246,6 +249,16 @@ class EmbyService {
   // -------------------------------------------------------------------------
   // Playback session reporting
   // -------------------------------------------------------------------------
+  private currentPlaySessionId: string | null = null;
+
+  private newPlaySessionId(): string {
+    // Simple UUID v4-like generator that works without crypto.randomUUID
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    });
+  }
+
   private buildSessionPayload(
     itemId: string,
     positionSeconds: number,
@@ -253,8 +266,12 @@ class EmbyService {
   ): Record<string, unknown> {
     return {
       ItemId: itemId,
+      MediaSourceId: itemId,
+      PlaySessionId: this.currentPlaySessionId ?? '',
       PositionTicks: secondsToTicks(positionSeconds),
-      QueueableMediaTypes: 'Video',
+      QueueableMediaTypes: ['Video'],
+      AudioStreamIndex: 1,
+      SubtitleStreamIndex: -1,
       CanSeek: true,
       PlayMethod: 'DirectStream',
       ...extras,
@@ -262,6 +279,7 @@ class EmbyService {
   }
 
   async reportPlaybackStart(itemId: string, positionSeconds: number): Promise<void> {
+    this.currentPlaySessionId = this.newPlaySessionId();
     const creds = await this.getCredentials();
     if (!creds) return;
     try {

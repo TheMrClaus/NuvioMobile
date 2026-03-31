@@ -43,10 +43,12 @@ export interface Stream {
   size?: number;
   isFree?: boolean;
   isDebrid?: boolean;
+  isEmby?: boolean;
   quality?: string;
   type?: string;
   lang?: string;
   fileIdx?: number;
+  embyItemId?: string;
 
   headers?: {
     Referer?: string;
