@@ -20,28 +20,40 @@ export const useEmbySession = (
   currentTime: number,
   paused: boolean
 ) => {
-  const hasStartedRef = useRef(false);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Keep a ref for the latest values to avoid stale closures in the interval
   const currentTimeRef = useRef(currentTime);
   const pausedRef = useRef(paused);
-  const embyItemIdRef = useRef(embyItemId);
 
   useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
   useEffect(() => { pausedRef.current = paused; }, [paused]);
-  useEffect(() => { embyItemIdRef.current = embyItemId; }, [embyItemId]);
 
-  // Report playback start once when embyItemId becomes available
+  // Session lifecycle: start when embyItemId becomes available, stop when it
+  // changes or the component unmounts.  The cleanup closure captures the
+  // embyItemId that was active when the effect ran, so the correct session is
+  // always stopped — even if the ref/prop has already moved to a new value.
   useEffect(() => {
     if (!embyItemId) return;
-    if (hasStartedRef.current) return;
 
-    hasStartedRef.current = true;
     embyService.reportPlaybackStart(embyItemId, currentTimeRef.current).catch((err) => {
       logger.warn('[useEmbySession] reportPlaybackStart error:', err);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
+
+      // Deferred so navigation can complete first
+      const positionAtStop = currentTimeRef.current;
+      setTimeout(() => {
+        embyService
+          .reportPlaybackStopped(embyItemId, positionAtStop)
+          .catch((err) => logger.warn('[useEmbySession] reportPlaybackStopped error:', err));
+      }, 0);
+    };
   }, [embyItemId]);
 
   // Send progress every PROGRESS_INTERVAL_MS while playing; pause/resume sends an immediate report
@@ -59,10 +71,8 @@ export const useEmbySession = (
 
     if (!paused) {
       progressTimerRef.current = setInterval(() => {
-        const itemId = embyItemIdRef.current;
-        if (!itemId) return;
         embyService
-          .reportPlaybackProgress(itemId, currentTimeRef.current, pausedRef.current)
+          .reportPlaybackProgress(embyItemId, currentTimeRef.current, pausedRef.current)
           .catch(() => {});
       }, PROGRESS_INTERVAL_MS);
     }
@@ -73,28 +83,5 @@ export const useEmbySession = (
         progressTimerRef.current = null;
       }
     };
-  // Re-run when paused state changes; embyItemId already guarded above
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embyItemId, paused]);
-
-  // Report stopped on component unmount (deferred so navigation can complete first)
-  useEffect(() => {
-    return () => {
-      const itemId = embyItemIdRef.current;
-      if (!itemId) return;
-
-      if (progressTimerRef.current) {
-        clearInterval(progressTimerRef.current);
-        progressTimerRef.current = null;
-      }
-
-      setTimeout(() => {
-        embyService
-          .reportPlaybackStopped(itemId, currentTimeRef.current)
-          .catch((err) => logger.warn('[useEmbySession] reportPlaybackStopped error:', err));
-      }, 0);
-    };
-  // Only run cleanup on unmount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 };

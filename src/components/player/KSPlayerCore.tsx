@@ -714,7 +714,8 @@ const KSPlayerCore: React.FC = () => {
         streamProvider: newProvider,
         streamName: newStreamName,
         headers: newStream.headers,
-        availableStreams: availableStreams
+        availableStreams: availableStreams,
+        embyItemId: newStream.embyItemId ?? undefined,
       });
     }, 100);
   };
@@ -767,6 +768,7 @@ const KSPlayerCore: React.FC = () => {
         episodeId: ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number} `,
         imdbId: imdbId ?? undefined,
         backdrop: backdrop || undefined,
+        embyItemId: stream.embyItemId ?? undefined,
       });
     }, 100);
   };

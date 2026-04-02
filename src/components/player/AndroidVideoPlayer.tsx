@@ -712,7 +712,8 @@ const AndroidVideoPlayer: React.FC = () => {
         streamProvider: newProvider,
         streamName: newStreamName,
         headers: newStream.headers,
-        availableStreams: availableStreams
+        availableStreams: availableStreams,
+        embyItemId: newStream.embyItemId ?? undefined,
       });
     }, 300);
   };
@@ -751,6 +752,7 @@ const AndroidVideoPlayer: React.FC = () => {
         backdrop: backdrop || undefined,
         availableStreams: {},
         groupedEpisodes: groupedEpisodes,
+        embyItemId: stream.embyItemId ?? undefined,
       });
     }, 300);
   };
