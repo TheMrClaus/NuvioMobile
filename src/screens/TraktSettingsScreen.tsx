@@ -232,11 +232,15 @@ const TraktSettingsScreen: React.FC = () => {
   }, [response, checkAuthStatus, request?.codeVerifier, navigation]);
 
   const handleSignIn = () => {
+    if (!TRAKT_CLIENT_ID) {
+      openAlert('Configuration Error', 'Trakt integration is not available. The client ID is missing from the app configuration.');
+      return;
+    }
     if (isSimklAuthenticated) {
       openAlert('Conflict', 'You cannot connect to Trakt while Simkl is connected. Please disconnect Simkl first.');
       return;
     }
-    promptAsync(); // Trigger the authentication flow
+    promptAsync();
   };
 
   const handleSignOut = async () => {

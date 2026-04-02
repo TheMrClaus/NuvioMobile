@@ -12,7 +12,7 @@ import TMDBIcon from '../../components/icons/TMDBIcon';
 import { SettingsCard, SettingItem, ChevronRight } from './SettingsComponents';
 import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
 import { useTranslation } from 'react-i18next';
-import { EMBY_SERVER_URL_KEY, EMBY_USER_ID_KEY } from '../../services/emby/embyService';
+import { embyService } from '../../services/emby/embyService';
 
 const { width } = Dimensions.get('window');
 
@@ -42,9 +42,7 @@ export const IntegrationsSettingsContent: React.FC<IntegrationsSettingsContentPr
             const openRouterKey = await mmkvStorage.getItem('openrouter_api_key');
             setOpenRouterKeySet(!!openRouterKey);
 
-            const embyUrl = await mmkvStorage.getItem(EMBY_SERVER_URL_KEY);
-            const embyUserId = await mmkvStorage.getItem(EMBY_USER_ID_KEY);
-            setEmbyConnected(!!(embyUrl && embyUserId));
+            setEmbyConnected(await embyService.isConnected());
         } catch (error) {
             if (__DEV__) console.error('Error loading integration data:', error);
         }

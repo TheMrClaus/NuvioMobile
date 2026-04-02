@@ -31,6 +31,7 @@ const EmbySettingsScreen: React.FC = () => {
 
   const [serverUrl, setServerUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [serverName, setServerName] = useState('');
@@ -167,16 +168,21 @@ const EmbySettingsScreen: React.FC = () => {
             {/* API Key */}
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: c.text }]}>API Key</Text>
-              <TextInput
-                style={[styles.textInput, { color: c.text, borderColor: c.elevation2, backgroundColor: c.elevation2 }]}
-                value={apiKey}
-                onChangeText={setApiKey}
-                placeholder="Paste your Emby API key here"
-                placeholderTextColor={c.lowEmphasis || c.mediumEmphasis}
-                autoCapitalize="none"
-                autoCorrect={false}
-                secureTextEntry={false}
-              />
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={[styles.textInput, styles.inputRowField, { color: c.text, borderColor: c.elevation2, backgroundColor: c.elevation2 }]}
+                  value={apiKey}
+                  onChangeText={setApiKey}
+                  placeholder="Paste your Emby API key here"
+                  placeholderTextColor={c.lowEmphasis || c.mediumEmphasis}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry={!showApiKey}
+                />
+                <TouchableOpacity onPress={() => setShowApiKey(v => !v)} style={styles.eyeButton}>
+                  <Feather name={showApiKey ? 'eye-off' : 'eye'} size={18} color={c.mediumEmphasis} />
+                </TouchableOpacity>
+              </View>
               <Text style={[styles.inputHint, { color: c.mediumEmphasis }]}>
                 Dashboard → Admin → API Keys → New API Key
               </Text>
@@ -292,6 +298,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === 'ios' ? 12 : 10,
     fontSize: 14,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputRowField: {
+    flex: 1,
+  },
+  eyeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   inputHint: { fontSize: 11, marginTop: 4 },
   divider: { height: 1, marginVertical: 4 },
